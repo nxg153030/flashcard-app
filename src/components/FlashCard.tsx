@@ -47,10 +47,12 @@ export function FlashCard({ question, answer, showAnswer, onFlip }: FlashCardPro
           }`}
           style={{ transform: "rotateY(180deg)" }}
         >
-          <div 
-            className="prose prose-lg max-w-none w-full overflow-y-auto flex-grow scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pr-4"
-            dangerouslySetInnerHTML={{ __html: answer }}
-          />
+          <div className="flex-grow flex items-center justify-center w-full">
+            <div 
+              className="prose prose-lg max-w-none w-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pr-4"
+              dangerouslySetInnerHTML={{ __html: answer }}
+            />
+          </div>
           <div className="mt-4 pt-2 text-sm text-gray-400 border-t w-full">
             Click to show question
           </div>
