@@ -11,6 +11,7 @@ import { Bars3Icon } from '@heroicons/react/24/outline';
 import { v4 as uuidv4 } from 'uuid';
 import { loadDeckFromMarkdown } from '@/utils/markdown';
 import { generateFlashcardsFromPDF } from '@/utils/gemini';
+import { generateFlashcardsFromDOCX } from '@/utils/docx';
 
 export default function Home() {
   const [decks, setDecks] = useState<FlashcardDeck[]>([]);
@@ -57,11 +58,21 @@ export default function Home() {
           }
           throw err;
         }
+      } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.endsWith('.docx')) {
+        try {
+          newDeck = await generateFlashcardsFromDOCX(file);
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('Gemini API key not found')) {
+            setShowApiKeyInstructions(true);
+            throw new Error('API key not configured. Please check the instructions below.');
+          }
+          throw err;
+        }
       } else if (file.name.endsWith('.md')) {
         const content = await file.text();
         newDeck = await loadDeckFromMarkdown(content);
       } else {
-        throw new Error('Unsupported file type. Please upload a PDF or Markdown file.');
+        throw new Error('Unsupported file type. Please upload a PDF, Word document, or Markdown file.');
       }
 
       const deck: FlashcardDeck = {
@@ -134,7 +145,7 @@ export default function Home() {
                 </span>
                 <input
                   type="file"
-                  accept=".pdf,.md"
+                  accept=".pdf,.md,.docx"
                   onChange={handleFileUpload}
                   className="hidden"
                   disabled={isLoading}

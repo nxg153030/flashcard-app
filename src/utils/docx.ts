@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Flashcard } from "@/types/flashcard";
+import mammoth from "mammoth";
+import { extractJSONFromText } from "./gemini";
 
 const FLASHCARD_GENERATION_PROMPT = `
 You are a helpful AI that creates flashcards from documents. For the given document:
@@ -22,31 +24,7 @@ You are a helpful AI that creates flashcards from documents. For the given docum
 8. Do not wrap the JSON in code blocks or markdown
 `;
 
-export function extractJSONFromText(text: string): string {
-  // Try to find JSON between code blocks first
-  const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-  if (codeBlockMatch) {
-    return codeBlockMatch[1];
-  }
-
-  // If no code blocks, try to find the first occurrence of { and last occurrence of }
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1) {
-    return text.slice(firstBrace, lastBrace + 1);
-  }
-
-  // If no JSON-like structure found, return the original text
-  return text;
-}
-
-export async function generateFlashcardsFromPDF(pdfFile: File): Promise<{ title: string; cards: Flashcard[] }> {
-  // Debug information
-  console.log('Environment variables:', {
-    NEXT_PUBLIC_GEMINI_API_KEY: process.env.NEXT_PUBLIC_GEMINI_API_KEY ? 'Set' : 'Not set',
-    NODE_ENV: process.env.NODE_ENV,
-  });
-
+export async function generateFlashcardsFromDOCX(file: File): Promise<{ title: string; cards: Flashcard[] }> {
   if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
     throw new Error(
       'Gemini API key not found. Please check:\n' +
@@ -58,20 +36,21 @@ export async function generateFlashcardsFromPDF(pdfFile: File): Promise<{ title:
   }
 
   try {
+    // Convert DOCX to HTML
+    const arrayBuffer = await file.arrayBuffer();
+    const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
+    
+    // Initialize Gemini AI
     const ai = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    // Convert PDF to base64
-    const buffer = await pdfFile.arrayBuffer();
-    const base64Data = Buffer.from(buffer).toString('base64');
 
     // Generate content
     const result = await model.generateContent([
       FLASHCARD_GENERATION_PROMPT,
       {
         inlineData: {
-          mimeType: 'application/pdf',
-          data: base64Data
+          mimeType: 'text/html',
+          data: Buffer.from(html).toString('base64')
         }
       }
     ]);
@@ -92,7 +71,7 @@ export async function generateFlashcardsFromPDF(pdfFile: File): Promise<{ title:
       }
 
       return {
-        title: parsedResponse.title || pdfFile.name.replace('.pdf', ''),
+        title: parsedResponse.title || file.name.replace('.docx', ''),
         cards: parsedResponse.cards
       };
     } catch (error) {
@@ -105,6 +84,6 @@ export async function generateFlashcardsFromPDF(pdfFile: File): Promise<{ title:
       throw error;
     }
     console.error('Error generating flashcards:', error);
-    throw new Error('Failed to generate flashcards from PDF');
+    throw new Error('Failed to generate flashcards from Word document');
   }
 } 
